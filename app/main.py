@@ -1,12 +1,11 @@
-from asyncio.log import logger
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import re
 import requests
-from os import getenv
 from config import TELEGRAM_BOT_TOKEN, RAINDROP_API_TOKEN, RAINDROP_API_ENDPOINT
-import logging 
-from google.cloud import logging as cloud_logging
+import logging
+import threading
+import socketserver
 
 # Configure the standard logging module
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +18,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def parse_url(update: Update, context: CallbackContext) -> None:
     message_text = update.message.text
+    logger.info(f'New request: {message_text}')
     urls = re.findall(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', message_text)
 
     if urls:
@@ -49,33 +49,30 @@ def save_url_to_raindrop(url: str) -> None:
         print(f"Failed to save URL '{url}' to Raindrop.io. Status code: {response.status_code}, Response: {response.json()}")
 
 
-def health_check(update, context):
-    update.message.reply_text("I'm healthy!")
+def health_check_handler(request, client_address, server):
+    request.sendall(b'HTTP/1.1 200 OK\r\n\r\nI am healthy!')
 
 
 def main() -> None:
+    # Start the HTTP server for health checks in a separate thread
+    http_server_thread = threading.Thread(target=start_health_check_server)
+    http_server_thread.start()
+
     updater = Updater(TELEGRAM_BOT_TOKEN)
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, parse_url))
-    dp.add_handler(CommandHandler("health", health_check))
-
-    # Start the Bot without a webhook URL initially
-    updater.start_polling()
-
-    # Get the actual webhook URL
-    webhook_info = updater.bot.getWebhookInfo()
-    cloud_run_url = webhook_info.url
-    logger.info(f'cloud_run_url is set to {cloud_run_url}')
-    webhook_url = cloud_run_url + TELEGRAM_BOT_TOKEN
-    logger.info(f'webhook_url is set to {webhook_url}')
-
-    # Update the webhook URL
-    updater.bot.setWebhook(webhook_url)
 
     # Run the bot until you send a signal to stop it
     updater.idle()
+
+
+def start_health_check_server():
+    port = 8080
+    httpd = socketserver.TCPServer(("0.0.0.0", port), health_check_handler)
+    logger.info(f"Health check server listening on port {port}")
+    httpd.serve_forever()
 
 
 if __name__ == '__main__':
