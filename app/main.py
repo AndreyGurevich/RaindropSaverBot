@@ -1,3 +1,4 @@
+import time
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import re
@@ -57,10 +58,20 @@ def main() -> None:
     # Start the HTTP server for health checks in a separate thread
     http_server_thread = threading.Thread(target=start_health_check_server)
     http_server_thread.start()
+    # Wait for 5 seconds (adjust as needed)
+    time.sleep(5)
 
+    # Get the actual webhook URL
     updater = Updater(TELEGRAM_BOT_TOKEN)
-    dp = updater.dispatcher
+    webhook_info = updater.bot.getWebhookInfo()
+    cloud_run_url = webhook_info.url
+    logger.info(f'cloud_run_url is {cloud_run_url}')
 
+    # Update the webhook URL with port 443
+    updater.bot.setWebhook(cloud_run_url + TELEGRAM_BOT_TOKEN, port=443)
+
+    # Create and set up the Telegram bot handlers
+    dp = updater.dispatcher
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, parse_url))
 
