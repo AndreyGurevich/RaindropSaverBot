@@ -68,8 +68,12 @@ def main() -> None:
     logger.info(f'cloud_run_url is {cloud_run_url}')
 
     # Update the webhook URL with port 443
-    updater.bot.setWebhook(cloud_run_url + TELEGRAM_BOT_TOKEN, port=443)
-
+    updater.start_webhook(listen='0.0.0.0',
+                          port=8080,
+                          url_path=TELEGRAM_BOT_TOKEN,
+                          # key='private.key',
+                          # cert='cert.pem',
+                          webhook_url=f'https://{cloud_run_url}:8080/{TELEGRAM_BOT_TOKEN}')
     # Create and set up the Telegram bot handlers
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("start", start))
