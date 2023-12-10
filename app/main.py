@@ -2,10 +2,13 @@ from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import re
 import requests
-from config import RAINDROP_API_ENDPOINT, BOT_ENDPOINT, RAINDROP_API_TOKEN, TELEGRAM_BOT_TOKEN
+from os import getenv
+from config import TELEGRAM_BOT_TOKEN, RAINDROP_API_TOKEN, RAINDROP_API_ENDPOINT
+
 
 def start(update: Update, context: CallbackContext) -> None:
     update.message.reply_text("Hello! I am your URL parser bot. Send me a message, and I will find and save the URLs for you.")
+
 
 def parse_url(update: Update, context: CallbackContext) -> None:
     message_text = update.message.text
@@ -18,6 +21,7 @@ def parse_url(update: Update, context: CallbackContext) -> None:
         update.message.reply_text(f"Found and saved the following URLs to your Raindrop.io account:\n{', '.join(urls)}")
     else:
         update.message.reply_text("No URLs found in the message.")
+
 
 def save_url_to_raindrop(url: str) -> None:
     headers = {
@@ -37,8 +41,10 @@ def save_url_to_raindrop(url: str) -> None:
     else:
         print(f"Failed to save URL '{url}' to Raindrop.io. Status code: {response.status_code}, Response: {response.json()}")
 
+
 def health_check(update, context):
     update.message.reply_text("I'm healthy!")
+
 
 def main() -> None:
     updater = Updater(TELEGRAM_BOT_TOKEN)
@@ -48,12 +54,19 @@ def main() -> None:
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, parse_url))
     dp.add_handler(CommandHandler("health", health_check))
 
-    # Start the Bot with webhook
-    updater.start_webhook(port=8080, listen="0.0.0.0", url_path=TELEGRAM_BOT_TOKEN)
-    updater.bot.set_webhook(BOT_ENDPOINT + TELEGRAM_BOT_TOKEN)
+    # Start the Bot without a webhook URL initially
+    updater.start_polling()
+
+    # Get the actual webhook URL
+    webhook_info = updater.bot.getWebhookInfo()
+    cloud_run_url = webhook_info.url
+
+    # Update the webhook URL
+    updater.bot.setWebhook(cloud_run_url + TELEGRAM_BOT_TOKEN)
 
     # Run the bot until you send a signal to stop it
     updater.idle()
+
 
 if __name__ == '__main__':
     main()
