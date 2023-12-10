@@ -1,9 +1,16 @@
+from asyncio.log import logger
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import re
 import requests
 from os import getenv
 from config import TELEGRAM_BOT_TOKEN, RAINDROP_API_TOKEN, RAINDROP_API_ENDPOINT
+import logging 
+from google.cloud import logging as cloud_logging
+
+# Configure the standard logging module
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def start(update: Update, context: CallbackContext) -> None:
@@ -60,9 +67,12 @@ def main() -> None:
     # Get the actual webhook URL
     webhook_info = updater.bot.getWebhookInfo()
     cloud_run_url = webhook_info.url
+    logger.info(f'cloud_run_url is set to {cloud_run_url}')
+    webhook_url = cloud_run_url + TELEGRAM_BOT_TOKEN
+    logger.info(f'webhook_url is set to {webhook_url}')
 
     # Update the webhook URL
-    updater.bot.setWebhook(cloud_run_url + TELEGRAM_BOT_TOKEN)
+    updater.bot.setWebhook(webhook_url)
 
     # Run the bot until you send a signal to stop it
     updater.idle()
